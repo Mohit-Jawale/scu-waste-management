@@ -1,0 +1,1581 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Leaflet and Chart.js Example</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.7.1/dist/leaflet.css" />
+  <style>
+    
+    #container {
+      display: flex;
+    }
+
+    #map {
+      flex: 1;
+      height: 700px;
+    }
+
+    #chart {
+      flex: 1;
+      height: 500px;
+    }
+    #description {
+    text-align: center;
+    flex: 1;
+    height: 500px;
+  }
+
+  #description p {
+    font-size: 50px;
+    color: #333;
+  }
+  #description p1 {
+    font-size: 20px;
+    color: #333;
+    
+  }
+
+  #myButton {
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+  }
+
+    #heading{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 0;
+  }
+
+
+
+
+  </style>
+</head>
+<body> 
+  <div id="heading"><h2>Santa Clara University Waste Management Visualization</h2></div>
+  <div id="container">
+    <div id="map"></div>
+    <div id="logodes">
+      <div id="description">
+        <p>Description</p>
+        <p1>This is Interactive Data Visualization Map of SCU waste management by their different buildings <br>
+          where I'm showing data by weights of different categories of waste data.<br>
+        <br> As by various graphs we can see that which places generate what type of waste
+        using this information around the campus <br>
+        we can manage the waste management more efficiently and effectively.<br>
+        <br> Also, you can filter data by year to see what type of waste was generate in that particular year and
+        by clicking on the label<br> when the graph is displayed we can do comparitive study of different categories.<br>
+        <br> The color Scheme used in the graph are RED for dangerous, GREEN for recyling, BROWN for landfill, <br>
+        GREY for disposable and BLUE for indicating the need for proper recycling and reusing.<br>
+        <br>The icons of the buildings in scu are intuitive are dispalyed on the map.<br>
+        Please click on Start to see the graph.<br>
+        <br></p1>
+        <button id="myButton" onclick="changeDiv()">Start</button>
+      </div>
+      <div id = "options" style="display: none;">
+        <select id="yearFilter" onchange="updateChart()">
+          <option value="all">All Years</option>
+          <option value="2016">2016</option>
+          <option value="2017">2017</option>
+          <option value="2018">2018</option>
+          <option value="2019">2019</option>
+          <option value="2020">2020</option>
+          <option value="2021">2021</option>
+          <option value="2022">2022</option>
+          <option value="2023">2023</option>
+        </select>
+      </div>
+      <div><canvas id="chart" style="display: none;"></canvas></div>
+    </div>
+  </div>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.7.1/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+
+
+        
+    // Initialize Leaflet map
+    const map = L.map('map').setView([37.3491, -121.9380], 16);
+
+    // Add the tile layer to the map
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+      maxZoom: 18,
+    }).addTo(map);
+
+        // Create a custom icon for the Benson location marker
+      var scuIcon = L.icon({
+      iconUrl: 'images/logos/scu.png', // Replace with the path to your custom marker icon
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+      popupAnchor: [0, -32]
+    });
+
+    function setMapFocus() {
+      map.setView([37.3491, -121.9380], 16); // Set the desired view coordinates and zoom level
+      map.invalidateSize(); // Refresh the map to ensure it fits within the frame
+    }
+
+
+
+    // Detect and mark a particular location within Santa Clara University
+    var scuMarker = L.marker([37.3491, -121.9380], { icon: scuIcon }).addTo(map);
+    scuMarker.bindPopup('<b>Santa Clara University</b><br> Waste management data').openPopup();
+    scuMarker.on('click', showChart);
+
+    function changeDiv() {
+      // Hide the initial div
+      document.getElementById("description").style.display = "none";
+
+      if (window.myChart) {
+        window.myChart.destroy();
+      }
+      
+      document.getElementById("options").style.display = "block";
+      // Show the new div
+      document.getElementById("chart").style.display = "block";
+
+    
+
+      showChart();
+      setMapFocus();
+    }
+
+
+    const colorScheme = {
+        'Recycling': 'rgba(51, 187, 79, 0.5)', // Bright green
+        'Landfill in Recycling': 'rgba(255, 0, 0, 0.5)', // Red
+        'Compost in Recycling': 'rgba(165, 89, 37, 0.5)', // Dark brown
+        'Compost': 'rgba(136, 81, 50, 0.5)', // Light brown
+        'Landfill in Compost': 'rgba(255, 0, 0, 0.5)', // Red
+        'Recycling in Compost': 'rgba(0, 153, 0, 0.5)', // Light green
+        'Compost in Landfill': 'rgba(255, 0, 0, 0.5)', // Red
+        'Recycling in Landfill': 'rgba(255, 0, 0, 0.5)', // Red
+        'Reusables in Landfill': 'rgba(170, 170, 170, 0.5)', // Light gray
+        'Landfill': 'rgba(170, 170, 170, 0.5)', // Light gray
+        'Reusables in Recycling': 'rgba(0, 0, 255, 0.5)', // Bright blue
+        'Reusables in Compost': 'rgba(165, 89, 37, 0.5)', // Dark brown
+        'Food Waste in Landfill': 'rgba(255, 0, 0, 0.5)', // Red
+        'Food Waste in Recycling': 'rgba(255, 0, 0, 0.5)' // Red
+      };
+
+    // Define a function to display the chart
+   function showChart() {
+      // Fetch the CSV file
+
+      // Destroy the previous chart if it exists
+      if (window.myChart) {
+        window.myChart.destroy();
+      }
+      fetch('data.csv')
+      .then(response => response.text())
+      .then(csvData => {
+        // Parse the CSV data
+        const rows = csvData.split('\n');
+        const labels = rows[0].split(',');
+        const dataset = [];
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i].split(',');
+          dataset.push(row);
+        }
+
+      const values = dataset.map(row => row[1]);
+      const streams_values = dataset.map(row=>row[2]);
+
+      // Get the unique values using Set
+      const buildings = [...new Set(values)];
+      const stream = [...new Set(streams_values)];
+
+
+      console.log(dataset);
+
+      const groupedData = {};
+
+      // Iterate over the data array
+      for (let i = 1; i < dataset.length; i++) {
+        const key1 = dataset[i][1]; // Get the value from row 0 as the grouping key
+        const key2 = dataset[i][2];
+        const value = parseFloat(dataset[i][5]); // Get the value from row 4 and convert it to a number
+        
+
+
+        const combinedKey = key1 + '_' + key2;
+        // Check if the grouping key already exists in the groupedData object
+        if (groupedData.hasOwnProperty(combinedKey)) {
+          // If the key exists, increment the sum by the value
+          groupedData[combinedKey] += value;
+        } else {
+          // If the key doesn't exist, initialize the sum with the value
+          groupedData[combinedKey] = value;
+        }
+      }
+
+      console.log(groupedData);
+
+      streamdata = Object.keys(groupedData)
+      weightdata = Object.values(groupedData)
+      console.log(streamdata);
+      console.log(weightdata);
+
+
+      const ctx = document.getElementById('chart').getContext('2d');
+
+      new_dataset = []
+      for (let i = 0; i < stream.length; i++) {
+          
+        
+        const building_labels = []
+
+        for( let j=0;j<buildings.length;j++){
+              building_labels.push(buildings[j]+'_'+stream[i]);
+        }
+        console.log(building_labels);
+        console.log(stream[i]);
+
+
+        const obj_label = {
+          label: stream[i],
+          data: [groupedData[building_labels[0]],groupedData[building_labels[1]],groupedData[building_labels[2]],groupedData[building_labels[3]],groupedData[building_labels[4]],groupedData[building_labels[5]],groupedData[building_labels[6]],groupedData[building_labels[7]]],
+          backgroundColor: colorScheme[stream[i]],
+          borderColor: 'rgba(0,0,0 0.8)',
+          borderWidth: 1 
+
+        }
+
+          new_dataset.push(obj_label);
+
+  
+        }
+
+
+    // Define the data for the chart
+    var data = {
+      labels: buildings,
+      datasets: new_dataset
+      
+    };
+        
+    // Configure the options for the chart
+    var options = {
+      maintainAspectRatio: false,
+      responsive: true,
+      plugins:{
+      legend: {
+            display: true //This will do the task
+          },
+      title: {
+                display: true,
+                text: 'SCU Waste management data by various Buildings by their weights'
+            } 
+          },
+      scales: {
+        x: {
+          stacked: true,
+        },
+        y: {
+          stacked: true
+        }
+      }
+    };
+
+    // Create the chart
+    window.myChart = new Chart(ctx, {
+      type: 'bar',
+      data: data,
+      options: options
+    });
+  });
+
+  
+    }
+
+    // Update the chart based on the selected year
+    function updateChart() {
+
+      
+      console.log(window.chart);
+      // Destroy the previous chart if it exists
+      if (window.myChart) {
+        window.myChart.destroy();
+      }
+
+      fetch('data.csv')
+      .then(response => response.text())
+      .then(csvData => {
+        // Parse the CSV data
+        const rows = csvData.split('\n');
+        const labels = rows[0].split(',');
+        const dataset = [];
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i].split(',');
+          dataset.push(row);
+        }
+
+      const yearFilter = document.getElementById('yearFilter').value;
+      console.log(yearFilter);
+
+
+      console.log(labels);
+
+
+      console.log(typeof yearFilter)
+      let filteredRows_1 = dataset;
+      
+      if (yearFilter!='all'){
+        const lastTwo = yearFilter.substring(yearFilter.length - 2);
+        filteredRows_1 = dataset.filter(obj => obj[0].toString().substring(obj[0].toString().length-2) === lastTwo);
+      }
+  
+      console.log(filteredRows_1);
+ 
+      const values = filteredRows_1.map(row => row[1]);
+      const streams_values = filteredRows_1.map(row=>row[2]);
+
+      // Get the unique values using Set
+      const buildings = [...new Set(values)];
+      const stream = [...new Set(streams_values)];
+
+
+      console.log(stream);
+
+      const groupedData = {};
+
+      // Iterate over the data array
+      for (let i = 1; i < filteredRows_1.length; i++) {
+        const key1 = filteredRows_1[i][1]; // Get the value from row 0 as the grouping key
+        const key2 = filteredRows_1[i][2];
+        const value = parseFloat(filteredRows_1[i][5]); // Get the value from row 4 and convert it to a number
+        
+
+
+        const combinedKey = key1 + '_' + key2;
+        // Check if the grouping key already exists in the groupedData object
+        if (groupedData.hasOwnProperty(combinedKey)) {
+          // If the key exists, increment the sum by the value
+          groupedData[combinedKey] += value;
+        } else {
+          // If the key doesn't exist, initialize the sum with the value
+          groupedData[combinedKey] = value;
+        }
+      }
+
+      console.log(groupedData);
+
+      // const sortedArray = Object.entries(groupedData).sort((a, b) => b[1] - a[1]);
+
+      // const sortedDict = Object.fromEntries(sortedArray);
+
+      streamdata = Object.keys(groupedData)
+      weightdata = Object.values(groupedData)
+      console.log(streamdata);
+      console.log(weightdata);
+
+
+      const ctx = document.getElementById('chart').getContext('2d');
+      let unique_stream = []
+      for(let i = 0;i<streamdata.length;i++)
+      {
+           s = streamdata[i].split('_')[1];
+           unique_stream.push(s);
+           
+      }
+
+      const uniquedata_stream = [...new Set(unique_stream)];
+
+      new_dataset = []
+      for (let i = 0; i < stream.length; i++) {
+          
+        
+        const building_labels = []
+
+        for( let j=0;j<buildings.length;j++){
+              building_labels.push(buildings[j]+'_'+stream[i]);
+        }
+        console.log(building_labels);
+        console.log(stream[i]);
+
+
+        const obj_label = {
+          label: stream[i],
+          data: [groupedData[building_labels[0]],groupedData[building_labels[1]],groupedData[building_labels[2]],groupedData[building_labels[3]],groupedData[building_labels[4]],groupedData[building_labels[5]],groupedData[building_labels[6]],groupedData[building_labels[7]]],
+          backgroundColor: colorScheme[stream[i]],
+          borderColor: 'rgba(0,0,0 0.8)',
+          borderWidth: 1 
+
+        }
+
+          new_dataset.push(obj_label);
+
+  
+        }
+
+
+    // Define the data for the chart
+    var data = {
+      labels: buildings,
+      datasets: new_dataset
+      
+    };
+
+    // Configure the options for the chart
+    var options = {
+      maintainAspectRatio: false,
+      responsive: true,
+      plugins:{
+      legend: {
+            display: true //This will do the task
+          },
+      title: {
+                display: true,
+                text: 'SCU Waste management data by various Buildings',
+                fontSize: 25,
+                fontWeight: 'bold'
+            } 
+          },
+      scales: {
+        x: {
+          stacked: true,
+        },
+        y: {
+          stacked: true
+        }
+      }
+    };
+
+    // Create the chart
+    window.myChart = new Chart(ctx, {
+      type: 'bar',
+      data: data,
+      options: options
+    });
+  });
+
+  
+
+     
+    }
+
+    function bensonChart(){
+
+      const ctx = document.getElementById('chart').getContext('2d');
+      
+      // Destroy the previous chart if it exists
+      if (window.myChart) {
+        window.myChart.destroy();
+      }
+      fetch('data.csv')
+      .then(response => response.text())
+      .then(csvData => {
+        // Parse the CSV data
+        const rows = csvData.split('\n');
+        const labels = rows[0].split(',');
+        const dataset = [];
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i].split(',');
+          dataset.push(row);
+        }
+
+      const values = dataset.map(row => row[1]);
+      const streams_values = dataset.map(row=>row[2]);
+
+      // Get the unique values using Set
+      const buildings = [...new Set(values)];
+      const stream = [...new Set(streams_values)];
+
+
+      console.log(stream);
+
+      const groupedData = {};
+
+      // Iterate over the data array
+      for (let i = 1; i < dataset.length; i++) {
+        const key1 = dataset[i][1]; // Get the value from row 0 as the grouping key
+        const key2 = dataset[i][2];
+        const value = parseFloat(dataset[i][5]); // Get the value from row 4 and convert it to a number
+        
+
+
+        const combinedKey = key1 + '_' + key2;
+        // Check if the grouping key already exists in the groupedData object
+        if (groupedData.hasOwnProperty(combinedKey)) {
+          // If the key exists, increment the sum by the value
+          groupedData[combinedKey] += value;
+        } else {
+          // If the key doesn't exist, initialize the sum with the value
+          groupedData[combinedKey] = value;
+        }
+      }
+
+      console.log(groupedData);
+
+      streamdata = Object.keys(groupedData)
+      weightdata = Object.values(groupedData)
+      console.log(streamdata);
+      console.log(weightdata);
+      const bensonData = {
+            "Benson Center_Compost": 14.600000000000001,
+            "Benson Center_Compost in Landfill": 616,
+            "Benson Center_Compost in Recycling": 6,
+            "Benson Center_Landfill": 81.71000000000001,
+            "Benson Center_Landfill in Compost": 0.01,
+            "Benson Center_Landfill in Recycling": 4.01,
+            "Benson Center_Recycling": 161.8,
+            "Benson Center_Recycling in Compost": 1.42,
+            "Benson Center_Recycling in Landfill": 313.22999999999985,
+            "Benson Center_Reusables in Compost": 0.8,
+            "Benson Center_Reusables in Landfill": 21.9,
+            "Benson Center_Reusables in Recycling": 8.7
+        };
+        const modifiedData = {};
+        for (const key in bensonData) {
+          const modifiedKey = key.split("_")[1];
+          modifiedData[modifiedKey] = bensonData[key];
+        }
+        var labels_stream =Object.keys(modifiedData)
+        var data_stream = Object.values(modifiedData)
+        console.log(labels_stream);
+
+     
+        const ctx = document.getElementById('chart').getContext('2d');
+
+// Define the data for the chart
+var data = {
+  labels: labels_stream,
+  datasets: [
+    {
+      label: "Benson Center",
+      data:data_stream,
+      backgroundColor: [colorScheme[labels_stream[0]],colorScheme[labels_stream[1]],colorScheme[labels_stream[2]],colorScheme[labels_stream[3]],colorScheme[labels_stream[4]],colorScheme[labels_stream[5]],colorScheme[labels_stream[6]],colorScheme[labels_stream[7]],colorScheme[labels_stream[8]],colorScheme[labels_stream[9]],colorScheme[labels_stream[10]],colorScheme[labels_stream[11]],colorScheme[labels_stream[12]],colorScheme[labels_stream[13]]], // Green
+    
+    }
+  ]
+};
+
+// Configure the options for the chart
+var options = {
+  plugins:{
+  legend: {
+         display: false //This will do the task
+      },
+      title: {
+                display: true,
+                text: 'Benson Center Waste management data'
+                
+            } 
+          },
+  maintainAspectRatio: false,
+  responsive: true,
+ 
+  scales: {
+    y: {
+          beginAtZero: true
+        },
+       
+  }
+};
+
+// Create the chart
+window.myChart = new Chart(ctx, {
+  type: 'bar',
+  data: data,
+  options: options
+});
+});
+  }
+
+    // Create a custom icon for the Benson location marker
+    var bensonIcon = L.icon({
+      iconUrl: 'images/logos/benson.png', // Replace with the path to your custom marker icon
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+      popupAnchor: [0, -32]
+    });
+
+    // Detect and mark a particular location within Santa Clara University
+    var bensonMarker = L.marker([37.347620403107136, -121.93928254663305], { icon: bensonIcon }).addTo(map);
+    bensonMarker.bindPopup('<b>BENSON</b><br> Dining Hall.');
+    bensonMarker.on('click', bensonChart);
+
+
+
+
+    function swigChart(){
+
+const ctx = document.getElementById('chart').getContext('2d');
+
+// Destroy the previous chart if it exists
+if (window.myChart) {
+  window.myChart.destroy();
+}
+fetch('data.csv')
+.then(response => response.text())
+.then(csvData => {
+  // Parse the CSV data
+  const rows = csvData.split('\n');
+  const labels = rows[0].split(',');
+  const dataset = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i].split(',');
+    dataset.push(row);
+  }
+
+const values = dataset.map(row => row[1]);
+const streams_values = dataset.map(row=>row[2]);
+
+// Get the unique values using Set
+const buildings = [...new Set(values)];
+const stream = [...new Set(streams_values)];
+
+
+console.log(stream);
+
+const groupedData = {};
+
+// Iterate over the data array
+for (let i = 1; i < dataset.length; i++) {
+  const key1 = dataset[i][1]; // Get the value from row 0 as the grouping key
+  const key2 = dataset[i][2];
+  const value = parseFloat(dataset[i][5]); // Get the value from row 4 and convert it to a number
+  
+
+
+  const combinedKey = key1 + '_' + key2;
+  // Check if the grouping key already exists in the groupedData object
+  if (groupedData.hasOwnProperty(combinedKey)) {
+    // If the key exists, increment the sum by the value
+    groupedData[combinedKey] += value;
+  } else {
+    // If the key doesn't exist, initialize the sum with the value
+    groupedData[combinedKey] = value;
+  }
+}
+
+console.log(groupedData);
+
+streamdata = Object.keys(groupedData)
+weightdata = Object.values(groupedData)
+console.log(streamdata);
+console.log(weightdata);
+const bensonData = {
+  "Swig_Compost in Landfill": 105,
+"Swig_Landfill": 62.5,
+"Swig_Recycling in Landfill": 137.75,
+"Swig_Reusables in Landfill": 7.6000000000000005
+  };
+  const modifiedData = {};
+  for (const key in bensonData) {
+    const modifiedKey = key.split("_")[1];
+    modifiedData[modifiedKey] = bensonData[key];
+  }
+  var labels_stream =Object.keys(modifiedData)
+  var data_stream = Object.values(modifiedData)
+  console.log(labels_stream);
+
+
+  const ctx = document.getElementById('chart').getContext('2d');
+
+// Define the data for the chart
+var data = {
+labels: labels_stream,
+datasets: [
+{
+label: "Swig",
+data:data_stream,
+backgroundColor: [colorScheme[labels_stream[0]],colorScheme[labels_stream[1]],colorScheme[labels_stream[2]],colorScheme[labels_stream[3]],colorScheme[labels_stream[4]],colorScheme[labels_stream[5]],colorScheme[labels_stream[6]],colorScheme[labels_stream[7]],colorScheme[labels_stream[8]],colorScheme[labels_stream[9]],colorScheme[labels_stream[10]],colorScheme[labels_stream[11]],colorScheme[labels_stream[12]],colorScheme[labels_stream[13]]], // Green
+
+}
+]
+};
+
+// Configure the options for the chart
+var options = {
+plugins:{
+legend: {
+   display: false //This will do the task
+},
+title: {
+          display: true,
+          text: 'Swig Waste management data'
+          
+      } 
+    },
+maintainAspectRatio: false,
+responsive: true,
+
+scales: {
+y: {
+    beginAtZero: true
+  },
+ 
+}
+};
+
+// Create the chart
+window.myChart = new Chart(ctx, {
+type: 'bar',
+data: data,
+options: options
+});
+});
+}
+
+    var swigIcon = L.icon({
+      iconUrl: 'images/logos/swig.png', // Replace with the path to your custom marker icon
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+      popupAnchor: [0, -32],
+      iconOptions: {
+          className: 'transparent-icon' // Add a class name to the icon
+              }
+    });
+
+    var swigMarker = L.marker([37.347066009703305, -121.94028032831399], { icon: swigIcon }).addTo(map);
+    swigMarker.bindPopup('<b>SWIG</b><br> Student Dorms.');
+    swigMarker.on('click', swigChart);
+
+
+  //Vari Hall and Lucas Hall
+  function Vari_Hall_and_Lucas_Hall_Chart(){
+
+const ctx = document.getElementById('chart').getContext('2d');
+
+// Destroy the previous chart if it exists
+if (window.myChart) {
+  window.myChart.destroy();
+}
+fetch('data.csv')
+.then(response => response.text())
+.then(csvData => {
+  // Parse the CSV data
+  const rows = csvData.split('\n');
+  const labels = rows[0].split(',');
+  const dataset = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i].split(',');
+    dataset.push(row);
+  }
+
+const values = dataset.map(row => row[1]);
+const streams_values = dataset.map(row=>row[2]);
+
+// Get the unique values using Set
+const buildings = [...new Set(values)];
+const stream = [...new Set(streams_values)];
+
+
+console.log(stream);
+
+const groupedData = {};
+
+// Iterate over the data array
+for (let i = 1; i < dataset.length; i++) {
+  const key1 = dataset[i][1]; // Get the value from row 0 as the grouping key
+  const key2 = dataset[i][2];
+  const value = parseFloat(dataset[i][5]); // Get the value from row 4 and convert it to a number
+  
+
+
+  const combinedKey = key1 + '_' + key2;
+  // Check if the grouping key already exists in the groupedData object
+  if (groupedData.hasOwnProperty(combinedKey)) {
+    // If the key exists, increment the sum by the value
+    groupedData[combinedKey] += value;
+  } else {
+    // If the key doesn't exist, initialize the sum with the value
+    groupedData[combinedKey] = value;
+  }
+}
+
+console.log(groupedData);
+
+streamdata = Object.keys(groupedData)
+weightdata = Object.values(groupedData)
+console.log(streamdata);
+console.log(weightdata);
+const bensonData = {
+  "Vari Hall and Lucas Hall_Compost in Landfill": 208.1,
+  "Vari Hall and Lucas Hall_Landfill": 66.1,
+  "Vari Hall and Lucas Hall_Recycling in Landfill": 91.9,
+  "Vari Hall and Lucas Hall_Reusables in Landfill": 14.3
+  };
+  const modifiedData = {};
+  for (const key in bensonData) {
+    const modifiedKey = key.split("_")[1];
+    modifiedData[modifiedKey] = bensonData[key];
+  }
+  var labels_stream =Object.keys(modifiedData)
+  var data_stream = Object.values(modifiedData)
+  console.log(labels_stream);
+
+
+  const ctx = document.getElementById('chart').getContext('2d');
+
+// Define the data for the chart
+var data = {
+labels: labels_stream,
+datasets: [
+{
+label: "Vari Hall and Lucas Hall",
+data:data_stream,
+backgroundColor: [colorScheme[labels_stream[0]],colorScheme[labels_stream[1]],colorScheme[labels_stream[2]],colorScheme[labels_stream[3]],colorScheme[labels_stream[4]],colorScheme[labels_stream[5]],colorScheme[labels_stream[6]],colorScheme[labels_stream[7]],colorScheme[labels_stream[8]],colorScheme[labels_stream[9]],colorScheme[labels_stream[10]],colorScheme[labels_stream[11]],colorScheme[labels_stream[12]],colorScheme[labels_stream[13]]], // Green
+
+}
+]
+};
+
+// Configure the options for the chart
+var options = {
+plugins:{
+legend: {
+   display: false //This will do the task
+},
+title: {
+          display: true,
+          text: 'Vari Hall and Lucas Hall Waste management data'
+          
+      } 
+    },
+maintainAspectRatio: false,
+responsive: true,
+
+scales: {
+y: {
+    beginAtZero: true
+  },
+ 
+}
+};
+
+// Create the chart
+window.myChart = new Chart(ctx, {
+type: 'bar',
+data: data,
+options: options
+});
+});
+}
+
+    
+      
+          
+
+
+          var lsbIcon = L.icon({
+          iconUrl: 'images/logos/lsb.png', // Replace with the path to your custom marker icon
+          iconSize: [32, 32],
+          iconAnchor: [16, 32],
+          popupAnchor: [0, -32]
+          });
+
+          var Vari_Hall_and_Lucas_Hall_Chart_Marker = L.marker([37.35110232659304, -121.93991554716615], { icon: lsbIcon }).addTo(map);
+          Vari_Hall_and_Lucas_Hall_Chart_Marker.bindPopup('<b>Vari Hall and Lucas Hall</b><br> Business school building');
+          Vari_Hall_and_Lucas_Hall_Chart_Marker.on('click', Vari_Hall_and_Lucas_Hall_Chart);
+
+      //Malley
+      function Malley_chart(){
+
+const ctx = document.getElementById('chart').getContext('2d');
+
+// Destroy the previous chart if it exists
+if (window.myChart) {
+  window.myChart.destroy();
+}
+fetch('data.csv')
+.then(response => response.text())
+.then(csvData => {
+  // Parse the CSV data
+  const rows = csvData.split('\n');
+  const labels = rows[0].split(',');
+  const dataset = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i].split(',');
+    dataset.push(row);
+  }
+
+const values = dataset.map(row => row[1]);
+const streams_values = dataset.map(row=>row[2]);
+
+// Get the unique values using Set
+const buildings = [...new Set(values)];
+const stream = [...new Set(streams_values)];
+
+
+console.log(stream);
+
+const groupedData = {};
+
+// Iterate over the data array
+for (let i = 1; i < dataset.length; i++) {
+  const key1 = dataset[i][1]; // Get the value from row 0 as the grouping key
+  const key2 = dataset[i][2];
+  const value = parseFloat(dataset[i][5]); // Get the value from row 4 and convert it to a number
+  
+
+
+  const combinedKey = key1 + '_' + key2;
+  // Check if the grouping key already exists in the groupedData object
+  if (groupedData.hasOwnProperty(combinedKey)) {
+    // If the key exists, increment the sum by the value
+    groupedData[combinedKey] += value;
+  } else {
+    // If the key doesn't exist, initialize the sum with the value
+    groupedData[combinedKey] = value;
+  }
+}
+
+console.log(groupedData);
+
+streamdata = Object.keys(groupedData)
+weightdata = Object.values(groupedData)
+console.log(streamdata);
+console.log(weightdata);
+const bensonData = {
+  "Malley_Compost": 76.9,
+  "Malley_Compost in Landfill": 120.4,
+  "Malley_Compost in Recycling": 24.9,
+  "Malley_Landfill": 54.51,
+  "Malley_Landfill in Compost": 2.2,
+  "Malley_Landfill in Recycling": 17.2,
+  "Malley_Recycling": 244.1,
+  "Malley_Recycling in Compost": 9.96,
+  "Malley_Recycling in Landfill": 77.86,
+  "Malley_Reusables in Compost": 0.41,
+  "Malley_Reusables in Landfill": 33,
+  "Malley_Reusables in Recycling": 15.1
+  };
+  const modifiedData = {};
+  for (const key in bensonData) {
+    const modifiedKey = key.split("_")[1];
+    modifiedData[modifiedKey] = bensonData[key];
+  }
+  var labels_stream =Object.keys(modifiedData)
+  var data_stream = Object.values(modifiedData)
+  console.log(labels_stream);
+
+
+  const ctx = document.getElementById('chart').getContext('2d');
+
+// Define the data for the chart
+var data = {
+labels: labels_stream,
+datasets: [
+{
+label: "Malley Center",
+data:data_stream,
+backgroundColor: [colorScheme[labels_stream[0]],colorScheme[labels_stream[1]],colorScheme[labels_stream[2]],colorScheme[labels_stream[3]],colorScheme[labels_stream[4]],colorScheme[labels_stream[5]],colorScheme[labels_stream[6]],colorScheme[labels_stream[7]],colorScheme[labels_stream[8]],colorScheme[labels_stream[9]],colorScheme[labels_stream[10]],colorScheme[labels_stream[11]],colorScheme[labels_stream[12]],colorScheme[labels_stream[13]]], // Green
+
+}
+]
+};
+
+// Configure the options for the chart
+var options = {
+plugins:{
+legend: {
+   display: false //This will do the task
+},
+title: {
+          display: true,
+          text: 'Malley Center Waste management data'
+          
+      } 
+    },
+maintainAspectRatio: false,
+responsive: true,
+
+scales: {
+y: {
+    beginAtZero: true
+  },
+ 
+}
+};
+
+// Create the chart
+window.myChart = new Chart(ctx, {
+type: 'bar',
+data: data,
+options: options
+});
+});
+
+      }
+
+        
+          
+        
+
+
+        var malleyIcon = L.icon({
+        iconUrl: 'images/logos/malley.png', // Replace with the path to your custom marker icon
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32]
+        });
+
+        var malley_marker = L.marker([37.3487483678394, -121.93666470982748], { icon: malleyIcon }).addTo(map);
+        malley_marker.bindPopup('<b>Malley Center</b><br> Gym and Sports building');
+        malley_marker.on('click', Malley_chart);
+        
+        //University Villas
+        function  University_Villas_chart(){
+          const ctx = document.getElementById('chart').getContext('2d');
+
+// Destroy the previous chart if it exists
+if (window.myChart) {
+  window.myChart.destroy();
+}
+fetch('data.csv')
+.then(response => response.text())
+.then(csvData => {
+  // Parse the CSV data
+  const rows = csvData.split('\n');
+  const labels = rows[0].split(',');
+  const dataset = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i].split(',');
+    dataset.push(row);
+  }
+
+const values = dataset.map(row => row[1]);
+const streams_values = dataset.map(row=>row[2]);
+
+// Get the unique values using Set
+const buildings = [...new Set(values)];
+const stream = [...new Set(streams_values)];
+
+
+console.log(stream);
+
+const groupedData = {};
+
+// Iterate over the data array
+for (let i = 1; i < dataset.length; i++) {
+  const key1 = dataset[i][1]; // Get the value from row 0 as the grouping key
+  const key2 = dataset[i][2];
+  const value = parseFloat(dataset[i][5]); // Get the value from row 4 and convert it to a number
+  
+
+
+  const combinedKey = key1 + '_' + key2;
+  // Check if the grouping key already exists in the groupedData object
+  if (groupedData.hasOwnProperty(combinedKey)) {
+    // If the key exists, increment the sum by the value
+    groupedData[combinedKey] += value;
+  } else {
+    // If the key doesn't exist, initialize the sum with the value
+    groupedData[combinedKey] = value;
+  }
+}
+
+console.log(groupedData);
+
+streamdata = Object.keys(groupedData)
+weightdata = Object.values(groupedData)
+console.log(streamdata);
+console.log(weightdata);
+const bensonData = {
+  "University Villas_Compost in Landfill": 170.3,
+  "University Villas_Landfill": 19.3,
+  "University Villas_Recycling in Landfill": 109.6,
+  "University Villas_Reusables in Landfill": 10.3
+  };
+  const modifiedData = {};
+  for (const key in bensonData) {
+    const modifiedKey = key.split("_")[1];
+    modifiedData[modifiedKey] = bensonData[key];
+  }
+  var labels_stream =Object.keys(modifiedData)
+  var data_stream = Object.values(modifiedData)
+  console.log(labels_stream);
+
+
+  const ctx = document.getElementById('chart').getContext('2d');
+
+// Define the data for the chart
+var data = {
+labels: labels_stream,
+datasets: [
+{
+label: "University Villas",
+data:data_stream,
+backgroundColor: [colorScheme[labels_stream[0]],colorScheme[labels_stream[1]],colorScheme[labels_stream[2]],colorScheme[labels_stream[3]],colorScheme[labels_stream[4]],colorScheme[labels_stream[5]],colorScheme[labels_stream[6]],colorScheme[labels_stream[7]],colorScheme[labels_stream[8]],colorScheme[labels_stream[9]],colorScheme[labels_stream[10]],colorScheme[labels_stream[11]],colorScheme[labels_stream[12]],colorScheme[labels_stream[13]]], // Green
+
+}
+]
+};
+
+// Configure the options for the chart
+var options = {
+plugins:{
+legend: {
+   display: false //This will do the task
+},
+title: {
+          display: true,
+          text: 'University Villas Center Waste management data'
+          
+      } 
+    },
+maintainAspectRatio: false,
+responsive: true,
+
+scales: {
+y: {
+    beginAtZero: true
+  },
+ 
+}
+};
+
+// Create the chart
+window.myChart = new Chart(ctx, {
+type: 'bar',
+data: data,
+options: options
+});
+});
+
+        
+          
+              
+              }
+
+
+              var uni_villas_Icon = L.icon({
+              iconUrl: 'images/logos/villas.png', // Replace with the path to your custom marker icon
+              iconSize: [32, 32],
+              iconAnchor: [16, 32],
+              popupAnchor: [0, -32]
+              });
+
+              var uni_villas_marker = L.marker([37.34960765663398, -121.93149341107058], { icon: uni_villas_Icon }).addTo(map);
+              uni_villas_marker.bindPopup('<b>Malley Center</b><br> Villas for Students');
+              uni_villas_marker.on('click',  University_Villas_chart);      
+
+        
+                  //Graham 
+        function  Graham_chart(){
+
+        
+          
+          const ctx = document.getElementById('chart').getContext('2d');
+
+// Destroy the previous chart if it exists
+if (window.myChart) {
+  window.myChart.destroy();
+}
+fetch('data.csv')
+.then(response => response.text())
+.then(csvData => {
+  // Parse the CSV data
+  const rows = csvData.split('\n');
+  const labels = rows[0].split(',');
+  const dataset = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i].split(',');
+    dataset.push(row);
+  }
+
+const values = dataset.map(row => row[1]);
+const streams_values = dataset.map(row=>row[2]);
+
+// Get the unique values using Set
+const buildings = [...new Set(values)];
+const stream = [...new Set(streams_values)];
+
+
+console.log(stream);
+
+const groupedData = {};
+
+// Iterate over the data array
+for (let i = 1; i < dataset.length; i++) {
+  const key1 = dataset[i][1]; // Get the value from row 0 as the grouping key
+  const key2 = dataset[i][2];
+  const value = parseFloat(dataset[i][5]); // Get the value from row 4 and convert it to a number
+  
+
+
+  const combinedKey = key1 + '_' + key2;
+  // Check if the grouping key already exists in the groupedData object
+  if (groupedData.hasOwnProperty(combinedKey)) {
+    // If the key exists, increment the sum by the value
+    groupedData[combinedKey] += value;
+  } else {
+    // If the key doesn't exist, initialize the sum with the value
+    groupedData[combinedKey] = value;
+  }
+}
+
+console.log(groupedData);
+
+streamdata = Object.keys(groupedData)
+weightdata = Object.values(groupedData)
+console.log(streamdata);
+console.log(weightdata);
+const bensonData = {
+  "Graham_Compost in Landfill": 93.4,
+  "Graham_Landfill": 28.11,
+  "Graham_Recycling in Landfill": 95.92,
+  "Graham_Reusables in Landfill": 16
+  };
+  const modifiedData = {};
+  for (const key in bensonData) {
+    const modifiedKey = key.split("_")[1];
+    modifiedData[modifiedKey] = bensonData[key];
+  }
+  var labels_stream =Object.keys(modifiedData)
+  var data_stream = Object.values(modifiedData)
+  console.log(labels_stream);
+
+
+  const ctx = document.getElementById('chart').getContext('2d');
+
+// Define the data for the chart
+var data = {
+labels: labels_stream,
+datasets: [
+{
+label: "Graham Center",
+data:data_stream,
+backgroundColor: [colorScheme[labels_stream[0]],colorScheme[labels_stream[1]],colorScheme[labels_stream[2]],colorScheme[labels_stream[3]],colorScheme[labels_stream[4]],colorScheme[labels_stream[5]],colorScheme[labels_stream[6]],colorScheme[labels_stream[7]],colorScheme[labels_stream[8]],colorScheme[labels_stream[9]],colorScheme[labels_stream[10]],colorScheme[labels_stream[11]],colorScheme[labels_stream[12]],colorScheme[labels_stream[13]]], // Green
+
+}
+]
+};
+
+// Configure the options for the chart
+var options = {
+plugins:{
+legend: {
+   display: false //This will do the task
+},
+title: {
+          display: true,
+          text: 'Graham Center Waste management data'
+          
+      } 
+    },
+maintainAspectRatio: false,
+responsive: true,
+
+scales: {
+y: {
+    beginAtZero: true
+  },
+ 
+}
+};
+
+// Create the chart
+window.myChart = new Chart(ctx, {
+type: 'bar',
+data: data,
+options: options
+});
+});
+                  }
+
+
+                  var Graham_Icon = L.icon({
+                  iconUrl: 'images/logos/swig.png', // Replace with the path to your custom marker icon
+                  iconSize: [32, 32],
+                  iconAnchor: [16, 32],
+                  popupAnchor: [0, -32]
+                  });
+
+                  var Graham_marker = L.marker([37.347460453900446, -121.93780351554523], { icon: Graham_Icon }).addTo(map);
+                  Graham_marker.bindPopup('<b>Graham</b><br> Students residency');
+                  Graham_marker.on('click',  Graham_chart);      
+
+      //Facilities            
+      function  Facilities_chart(){
+        const ctx = document.getElementById('chart').getContext('2d');
+
+// Destroy the previous chart if it exists
+if (window.myChart) {
+  window.myChart.destroy();
+}
+fetch('data.csv')
+.then(response => response.text())
+.then(csvData => {
+  // Parse the CSV data
+  const rows = csvData.split('\n');
+  const labels = rows[0].split(',');
+  const dataset = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i].split(',');
+    dataset.push(row);
+  }
+
+const values = dataset.map(row => row[1]);
+const streams_values = dataset.map(row=>row[2]);
+
+// Get the unique values using Set
+const buildings = [...new Set(values)];
+const stream = [...new Set(streams_values)];
+
+
+console.log(stream);
+
+const groupedData = {};
+
+// Iterate over the data array
+for (let i = 1; i < dataset.length; i++) {
+  const key1 = dataset[i][1]; // Get the value from row 0 as the grouping key
+  const key2 = dataset[i][2];
+  const value = parseFloat(dataset[i][5]); // Get the value from row 4 and convert it to a number
+  
+
+
+  const combinedKey = key1 + '_' + key2;
+  // Check if the grouping key already exists in the groupedData object
+  if (groupedData.hasOwnProperty(combinedKey)) {
+    // If the key exists, increment the sum by the value
+    groupedData[combinedKey] += value;
+  } else {
+    // If the key doesn't exist, initialize the sum with the value
+    groupedData[combinedKey] = value;
+  }
+}
+
+console.log(groupedData);
+
+streamdata = Object.keys(groupedData)
+weightdata = Object.values(groupedData)
+console.log(streamdata);
+console.log(weightdata);
+const bensonData = {
+  "Facilities_Compost": 36.6,
+  "Facilities_Compost in Landfill": 37.7,
+  "Facilities_Compost in Recycling": 5.8,
+  "Facilities_Landfill": 18.8,
+  "Facilities_Landfill in Compost": 2.6,
+  "Facilities_Landfill in Recycling": 8.6,
+  "Facilities_Recycling": 57.5,
+  "Facilities_Recycling in Compost": 3.6,
+  "Facilities_Recycling in Landfill": 51.6
+  };
+  const modifiedData = {};
+  for (const key in bensonData) {
+    const modifiedKey = key.split("_")[1];
+    modifiedData[modifiedKey] = bensonData[key];
+  }
+  var labels_stream =Object.keys(modifiedData)
+  var data_stream = Object.values(modifiedData)
+  console.log(labels_stream);
+
+
+  const ctx = document.getElementById('chart').getContext('2d');
+
+// Define the data for the chart
+var data = {
+labels: labels_stream,
+datasets: [
+{
+label: "Facilities Center",
+data:data_stream,
+backgroundColor: [colorScheme[labels_stream[0]],colorScheme[labels_stream[1]],colorScheme[labels_stream[2]],colorScheme[labels_stream[3]],colorScheme[labels_stream[4]],colorScheme[labels_stream[5]],colorScheme[labels_stream[6]],colorScheme[labels_stream[7]],colorScheme[labels_stream[8]],colorScheme[labels_stream[9]],colorScheme[labels_stream[10]],colorScheme[labels_stream[11]],colorScheme[labels_stream[12]],colorScheme[labels_stream[13]]], // Green
+
+}
+]
+};
+
+// Configure the options for the chart
+var options = {
+plugins:{
+legend: {
+   display: false //This will do the task
+},
+title: {
+          display: true,
+          text: 'Facilities Center Waste management data'
+          
+      } 
+    },
+maintainAspectRatio: false,
+responsive: true,
+
+scales: {
+y: {
+    beginAtZero: true
+  },
+ 
+}
+};
+
+// Create the chart
+window.myChart = new Chart(ctx, {
+type: 'bar',
+data: data,
+options: options
+});
+});
+        
+          
+                 
+                  }
+
+
+                  var fac_Icon = L.icon({
+                  iconUrl: 'images/logos/fac.png', // Replace with the path to your custom marker icon
+                  iconSize: [32, 32],
+                  iconAnchor: [16, 32],
+                  popupAnchor: [0, -32]
+                  });
+
+                  var fac_marker = L.marker([37.34619386947905, -121.93455804276678], { icon: fac_Icon }).addTo(map);
+                  fac_marker.bindPopup('<b>Facilities</b><br> University Post office');
+                  fac_marker.on('click',  Facilities_chart);
+                  
+        
+        //Learning Commons        
+      function  library_chart(){
+
+        
+                          
+        const ctx = document.getElementById('chart').getContext('2d');
+
+// Destroy the previous chart if it exists
+if (window.myChart) {
+  window.myChart.destroy();
+}
+fetch('data.csv')
+.then(response => response.text())
+.then(csvData => {
+  // Parse the CSV data
+  const rows = csvData.split('\n');
+  const labels = rows[0].split(',');
+  const dataset = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i].split(',');
+    dataset.push(row);
+  }
+
+const values = dataset.map(row => row[1]);
+const streams_values = dataset.map(row=>row[2]);
+
+// Get the unique values using Set
+const buildings = [...new Set(values)];
+const stream = [...new Set(streams_values)];
+
+
+console.log(stream);
+
+const groupedData = {};
+
+// Iterate over the data array
+for (let i = 1; i < dataset.length; i++) {
+  const key1 = dataset[i][1]; // Get the value from row 0 as the grouping key
+  const key2 = dataset[i][2];
+  const value = parseFloat(dataset[i][5]); // Get the value from row 4 and convert it to a number
+  
+
+
+  const combinedKey = key1 + '_' + key2;
+  // Check if the grouping key already exists in the groupedData object
+  if (groupedData.hasOwnProperty(combinedKey)) {
+    // If the key exists, increment the sum by the value
+    groupedData[combinedKey] += value;
+  } else {
+    // If the key doesn't exist, initialize the sum with the value
+    groupedData[combinedKey] = value;
+  }
+}
+
+console.log(groupedData);
+
+streamdata = Object.keys(groupedData)
+weightdata = Object.values(groupedData)
+console.log(streamdata);
+console.log(weightdata);
+const bensonData = {
+  "Learning Commons_Compost in Landfill": 14.7,
+  "Learning Commons_Compost in Recycling": 1.1,
+  "Learning Commons_Food Waste in Landfill": 6.4,
+  "Learning Commons_Food Waste in Recycling": 1.7,
+  "Learning Commons_Landfill": 10.9,
+  "Learning Commons_Landfill in Recycling": 3.3,
+  "Learning Commons_Recycling": 48.6,
+  "Learning Commons_Recycling in Landfill": 10.8
+  };
+  const modifiedData = {};
+  for (const key in bensonData) {
+    const modifiedKey = key.split("_")[1];
+    modifiedData[modifiedKey] = bensonData[key];
+  }
+  var labels_stream =Object.keys(modifiedData)
+  var data_stream = Object.values(modifiedData)
+  console.log(labels_stream);
+
+
+  const ctx = document.getElementById('chart').getContext('2d');
+
+// Define the data for the chart
+var data = {
+labels: labels_stream,
+datasets: [
+{
+label: "Learning Commons Center",
+data:data_stream,
+backgroundColor: [colorScheme[labels_stream[0]],colorScheme[labels_stream[1]],colorScheme[labels_stream[2]],colorScheme[labels_stream[3]],colorScheme[labels_stream[4]],colorScheme[labels_stream[5]],colorScheme[labels_stream[6]],colorScheme[labels_stream[7]],colorScheme[labels_stream[8]],colorScheme[labels_stream[9]],colorScheme[labels_stream[10]],colorScheme[labels_stream[11]],colorScheme[labels_stream[12]],colorScheme[labels_stream[13]]], // Green
+
+}
+]
+};
+
+// Configure the options for the chart
+var options = {
+plugins:{
+legend: {
+   display: false //This will do the task
+},
+title: {
+          display: true,
+          text: 'Learning Commons Center Waste management data'
+          
+      } 
+    },
+maintainAspectRatio: false,
+responsive: true,
+
+scales: {
+y: {
+    beginAtZero: true
+  },
+ 
+}
+};
+
+// Create the chart
+window.myChart = new Chart(ctx, {
+type: 'bar',
+data: data,
+options: options
+});
+});
+                }
+
+
+                var library_Icon = L.icon({
+                iconUrl: 'images/logos/lib.png', // Replace with the path to your custom marker icon
+                iconSize: [32, 32],
+                iconAnchor: [16, 32],
+                popupAnchor: [0, -32]
+                });
+
+                var lib_marker = L.marker([37.34810013488749, -121.93773377806869], { icon: library_Icon }).addTo(map);
+                lib_marker.bindPopup('<b>Learning Commons</b><br> University Library and study center');
+                lib_marker.on('click', library_chart);           
+
+  </script>
+</body>
+</html>
